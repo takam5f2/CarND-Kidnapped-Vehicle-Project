@@ -34,7 +34,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
   for (unsigned int i = 0; i < this->num_particles; i++) {
     Particle particle;
-    particle.id = i;
+    particle.id = (int)i;
     particle.x = dist_x(rand_eng);
     particle.y = dist_y(rand_eng);
     particle.theta = dist_theta(rand_eng);
@@ -48,7 +48,21 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	// NOTE: When adding noise you may find std::normal_distribution and std::default_random_engine useful.
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
+  default_random_engine rand_eng;
+  normal_distribution<double> dist_velocity(velocity, std_pos[0]);
+  normal_distribution<double> dist_yaw_rate(yaw_rate, std_pos[2]);
 
+  for (unsigned int i = 0; i < this->num_particles; i++) {
+    double vel = dist_velocity(rand_eng);
+    double yrate = dist_yaw_rate(yaw_rate);
+    double new_theta = particles[i].theta + yrate * delta_t;
+    double new_x = particles[i].x + vel / yrate * (sin(new_theta) - sin(particles[i].theta));
+    double new_y = particles[i].y + vel / yrate * (cos(particles[i].theta) - cos(new_theta));
+
+    particles[i].x = new_x;
+    particles[i].y = new_y;
+    particles[i].theta = new_theta;
+  }
 }
 
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
@@ -56,7 +70,22 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	//   observed measurement to this particular landmark.
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
-
+  for (unsigned int i = 0; i < predicted.size(); i++) {
+    LandmarkObs *roi = &predicted[i];
+    double min_dist = 0;
+    for (unsigned int j = 0; j < observations.size(); j++) {
+      double dist = pow((roi->x - observations[i].x), 2) + pow((roi->y - observations[i].y), 2);
+      if (j == 0) {
+        observations[j].id = roi->id;
+        min_dist = dist;
+      } else {
+        if (dist < min_dist) {
+          observations[j].id = roi->id;
+          min_dist = dist;
+        } // if (dist < min_dist)
+      } // if (i == 0)
+    } // for (unsigned int j = 0; j < observations.size(); j++)
+  } // for (unsigned int i = 0; i < predicted.size(); i++)
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
