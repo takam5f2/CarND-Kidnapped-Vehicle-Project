@@ -57,8 +57,8 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
     double vel = dist_velocity(rand_eng);
     double yrate = dist_yaw_rate(rand_eng);
     double new_theta = particles[i].theta + yrate * delta_t;
-    double new_x = particles[i].x + vel / (yrate + 1E-7) * (sin(new_theta) - sin(particles[i].theta));
-    double new_y = particles[i].y + vel / (yrate + 1E-7) * (cos(particles[i].theta) - cos(new_theta));
+    double new_x = particles[i].x + vel / (yrate + 1E-9) * (sin(new_theta) - sin(particles[i].theta));
+    double new_y = particles[i].y + vel / (yrate + 1E-9) * (cos(particles[i].theta) - cos(new_theta));
 
     particles[i].x = new_x;
     particles[i].y = new_y;
@@ -165,10 +165,11 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     weights.push_back(particle_weights);
     cout << particle_weights << endl;
   }
-
+  cout << "weights sum" << weights_sum << endl;
   // normalize particle weights
   for (int i = 0; i < weights.size(); i++) {
     weights[i] = weights[i] / weights_sum;
+    particles[i].weight = weights[i];
   }
 }
 
@@ -183,9 +184,13 @@ void ParticleFilter::resample() {
 
   for (int i = 0; i < num_particles; i++) {
     int idx = d(rand_eng);
+    cout << "particle "<< idx << " is chosen which has weights of " << weights[idx] << endl;
     Particle new_particle;
+    new_particle.id = particles[idx].id;
     new_particle.x = particles[idx].x;
     new_particle.y = particles[idx].y;
+    new_particle.theta = particles[idx].theta;
+    new_particle.weight = particles[idx].weight;
     new_particles.push_back(new_particle);
   }
   particles = new_particles;
