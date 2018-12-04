@@ -26,7 +26,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
 
   // initilize number of particle.
-  num_particles = 1000;
+  num_particles = 100;
   default_random_engine rand_eng;
   normal_distribution<double> dist_x(x, std[0]);
   normal_distribution<double> dist_y(y, std[0]);
@@ -57,8 +57,8 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
     double vel = dist_velocity(rand_eng);
     double yrate = dist_yaw_rate(rand_eng);
     double new_theta = particles[i].theta + yrate * delta_t;
-    double new_x = particles[i].x + vel / yrate * (sin(new_theta) - sin(particles[i].theta));
-    double new_y = particles[i].y + vel / yrate * (cos(particles[i].theta) - cos(new_theta));
+    double new_x = particles[i].x + vel / (yrate + 1E-7) * (sin(new_theta) - sin(particles[i].theta));
+    double new_y = particles[i].y + vel / (yrate + 1E-7) * (cos(particles[i].theta) - cos(new_theta));
 
     particles[i].x = new_x;
     particles[i].y = new_y;
@@ -69,23 +69,25 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
 	// TODO: Find the predicted measurement that is closest to each observed measurement and assign the 
 	//   observed measurement to this particular landmark.
-	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
+ 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
   for (int i = 0; i < predicted.size(); i++) {
     LandmarkObs *roi = &predicted[i];
     double min_dist = 0;
+    int min_idx = 0;
     for (int j = 0; j < observations.size(); j++) {
-      double dist = pow((roi->x - observations[i].x), 2) + pow((roi->y - observations[i].y), 2);
+      double dist = pow((roi->x - observations[j].x), 2) + pow((roi->y - observations[j].y), 2);
       if (j == 0) {
-        observations[j].id = roi->id;
+        min_idx = j;
         min_dist = dist;
       } else {
         if (dist < min_dist) {
-          observations[j].id = roi->id;
+          min_idx = j;
           min_dist = dist;
         } // if (dist < min_dist)
       } // if (i == 0)
     } // for (int j = 0; j < observations.size(); j++)
+    observations[min_idx].id = roi->id;
   } // for (int i = 0; i < predicted.size(); i++)
 }
 
@@ -131,6 +133,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       LandmarkObs trans_obs_landmark;
       double obs_x = observations[j].x;
       double obs_y = observations[j].y;
+      trans_obs_landmark.id = -1;
       trans_obs_landmark.x = roi_particle.x + (cos(roi_particle.theta) * obs_x) - (sin(roi_particle.theta) * obs_y);
       trans_obs_landmark.y = roi_particle.y + (sin(roi_particle.theta) * obs_x) + (cos(roi_particle.theta) * obs_y);
       trans_observations.push_back(trans_obs_landmark);
@@ -142,6 +145,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     for (int j = 0; j < trans_observations.size(); j++) {
       for (int k = 0; k < roi_landmarks.size(); k++) {
         if (trans_observations[j].id == roi_landmarks[k].id) {
+          cout << i << " obs.id " << trans_observations[j].id << ", " << roi_landmarks[k].id << endl;
+          cout << i << " obs.x " << trans_observations[j].x << ", " << roi_landmarks[k].x << endl;
+          cout << i << " obs.y " << trans_observations[j].y << ", " << roi_landmarks[k].y << endl;
           double exp_x = (trans_observations[j].x - roi_landmarks[k].x);
           exp_x = exp_x * exp_x;
           exp_x = exp_x / (2*std_landmark[0]*std_landmark[0]);
@@ -149,13 +155,15 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
           exp_y = exp_y * exp_y;
           exp_y = exp_y / (2*std_landmark[1]*std_landmark[1]);
           double roi_weights = exp(-1 * (exp_x + exp_y));
+          cout << i << " particle roi weights = " << roi_weights << ", sum = "<< (exp_x + exp_y) << endl;
           roi_weights = roi_weights / (2 * M_PI * std_landmark[0] * std_landmark[1]);
-             particle_weights *= roi_weights;
+          particle_weights *= roi_weights;
         } // if 
       } // for (k = )
     } // for (j = )
     weights_sum += particle_weights;
     weights.push_back(particle_weights);
+    cout << particle_weights << endl;
   }
 
   // normalize particle weights
