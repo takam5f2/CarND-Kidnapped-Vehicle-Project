@@ -42,6 +42,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
       
     particles.push_back(particle);
   }
+  // initialize is done.
   is_initialized = true;
 }
 
@@ -56,16 +57,19 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
     double new_x;
     double new_y;
     double new_theta;
+    // in the case that yaw_rate is not 0
     if (fabs(yaw_rate) > 1E-4) {
       new_theta = particles[i].theta + yaw_rate * delta_t;
       new_x = particles[i].x + velocity / yaw_rate * (sin(new_theta) - sin(particles[i].theta));
       new_y = particles[i].y + velocity / yaw_rate * (cos(particles[i].theta) - cos(new_theta));
     }
+    // in the case of yaw_rate is 0
     else {
       new_x = particles[i].x + velocity * delta_t * sin(particles[i].theta);
       new_y = particles[i].y + velocity * delta_t * cos(particles[i].theta);
       new_theta = particles[i].theta;
     }
+    // normal distribution for each position value.
     normal_distribution<double> dist_x(new_x, std_pos[0]);
     normal_distribution<double> dist_y(new_y, std_pos[1]);
     normal_distribution<double> dist_theta(new_theta, std_pos[2]);
@@ -81,20 +85,22 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	//   observed measurement to this particular landmark.
  	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
+
+  // loop for each observation
   for (int i = 0; i < observations.size(); i++) {
     LandmarkObs *obs = &observations[i];
     double min_dist = 0;
     int min_idx = 0;
-
+    // seeking corresponding predicted landmark.
     for (int j = 0; j < predicted.size(); j++) {
-      double dist = pow((obs->x - predicted[j].x), 2) + pow((obs->y - predicted[j].y), 2);
+      double dist_tmp = dist(obs->x, obs->y, predicted[j].x, predicted[j].y);
       if (j == 0) {
         min_idx = j;
-        min_dist = dist;
+        min_dist = dist_tmp;
       } else {
-        if (dist < min_dist) {
+        if (dist_tmp < min_dist) {
           min_idx = j;
-          min_dist = dist;
+          min_dist = dist_tmp;
         } // if (dist < min_dist)
       } // if (i == 0)
     } // for (int j = 0; j < observations.size(); j++)
@@ -130,8 +136,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       int land_id = map_landmarks.landmark_list[j].id_i;
       float land_x = map_landmarks.landmark_list[j].x_f;
       float land_y = map_landmarks.landmark_list[j].y_f;
-      double land_dist = pow((roi_particle.x - land_x), 2) + pow((roi_particle.y - land_y), 2);
-      land_dist = sqrt(land_dist);
+      double land_dist = dist(roi_particle.x, roi_particle.y, land_x, land_y);
       if (land_dist < sensor_range) {
         LandmarkObs obs_landmark;
         obs_landmark.id = land_id;
@@ -164,7 +169,6 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
           exp_y = exp_y * exp_y;
           exp_y = exp_y / (2*std_landmark[1]*std_landmark[1]);
           double roi_weights = exp(-1 * (exp_x + exp_y));
-          // cout << i << " particle roi weights = " << roi_weights << ", sum = "<< (exp_x + exp_y) << endl;
           roi_weights = roi_weights / (2 * M_PI * std_landmark[0] * std_landmark[1]);
           particle_weight *= roi_weights;
         } // if 
@@ -172,9 +176,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     } // for (j = )
     particles[i].weight = particle_weight;
     weights_sum += particles[i].weight;
-    // cout << particle_weights << endl;
   }
-  // cout << "weights sum" << weights_sum << endl;
   // normalize particle weights
   for (int i = 0; i < num_particles; i++) {
     particles[i].weight = particles[i].weight / weights_sum;
@@ -193,7 +195,6 @@ void ParticleFilter::resample() {
 
   for (int i = 0; i < num_particles; i++) {
     int idx = d(rand_eng);
-    // cout << "particle "<< idx << " is newly chosen which has weights of " << weights[idx] << endl;
     Particle new_particle;
     new_particle.id = idx;
     new_particle.x = particles[idx].x;
@@ -203,9 +204,6 @@ void ParticleFilter::resample() {
     new_particles.push_back(new_particle);
   }
   particles = new_particles;
-  // for (int i = 0; i < num_particles; i++) {
-    // cout << "particle "<< particles[i].id << " is chosen which has weights of " << weights[particles[i].id] << endl;
-  // }
 }
 
 Particle ParticleFilter::SetAssociations(Particle& particle, const std::vector<int>& associations, 
